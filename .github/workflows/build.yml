@@ -1,0 +1,33 @@
+name: macOS build and tests
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Static privacy guardrails
+        run: python3 Scripts/audit-source.py
+      - name: English repository text
+        run: python3 Scripts/check-repository-language.py
+      - name: Core and stdio tests (no credentials or network)
+        run: swift test
+      - name: Compile app and WidgetKit extension
+        run: >-
+          xcodebuild -project CodexUsageMonitor.xcodeproj
+          -scheme CodexUsageMonitor -configuration Release
+          -destination 'platform=macOS' -derivedDataPath build
+          CODE_SIGNING_ALLOWED=NO build
+      - name: Native Xcode tests
+        run: |
+          xcodebuild -project CodexUsageMonitor.xcodeproj \
+            -scheme CodexUsageMonitor -configuration Debug \
+            -destination 'platform=macOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO build-for-testing
+          xcrun xctest build/Build/Products/Debug/CodexUsageMonitorTests.xctest
